@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, CalendarDays, Dumbbell, Layers3, Save } from 'lucide-react';
+import { Activity, AlertTriangle, CalendarDays, Dumbbell, Layers3, Save } from 'lucide-react';
 import { DayPicker } from './components/DayPicker';
 import { ExerciseCard } from './components/ExerciseCard';
 import { MuscleTabs } from './components/MuscleTabs';
@@ -18,6 +18,7 @@ function App() {
   const [exerciseInput, setExerciseInput] = useState('');
   const [exerciseMuscles, setExerciseMuscles] = useState('');
   const [activeMuscle, setActiveMuscle] = useState('All');
+  const [deletePrompt, setDeletePrompt] = useState(null);
 
   const dayPlan = plan[activeDay];
   const muscleGroups = useMemo(() => splitMuscleList(dayPlan.muscles), [dayPlan.muscles]);
@@ -66,11 +67,32 @@ function App() {
     setMuscleInput('');
   };
 
+  const requestDelete = (prompt) => {
+    setDeletePrompt(prompt);
+  };
+
+  const closeDeletePrompt = () => {
+    setDeletePrompt(null);
+  };
+
+  const confirmDelete = () => {
+    deletePrompt?.onConfirm();
+    closeDeletePrompt();
+  };
+
   const removeMuscle = (muscle) => {
     updateDay(activeDay, (current) => ({
       ...current,
       muscles: splitMuscleList(current.muscles).filter((item) => item !== muscle),
     }));
+  };
+
+  const confirmRemoveMuscle = (muscle) => {
+    requestDelete({
+      title: 'Delete muscle?',
+      message: `Remove ${muscle} from ${activeDay}? Exercises already linked to this muscle will stay.`,
+      onConfirm: () => removeMuscle(muscle),
+    });
   };
 
   const filteredExercises = useMemo(() => {
@@ -116,6 +138,16 @@ function App() {
     }));
   };
 
+  const confirmRemoveExercise = (exerciseId) => {
+    const exercise = dayPlan.exercises.find((item) => item.id === exerciseId);
+
+    requestDelete({
+      title: 'Delete exercise?',
+      message: `Delete ${exercise?.name || 'this exercise'} and all of its sessions from ${activeDay}?`,
+      onConfirm: () => removeExercise(exerciseId),
+    });
+  };
+
   const addSession = (exerciseId) => {
     updateDay(activeDay, (current) => ({
       ...current,
@@ -149,6 +181,17 @@ function App() {
           : exercise,
       ),
     }));
+  };
+
+  const confirmRemoveSession = (exerciseId, sessionId) => {
+    const exercise = dayPlan.exercises.find((item) => item.id === exerciseId);
+    const session = exercise?.sessions.find((item) => item.id === sessionId);
+
+    requestDelete({
+      title: 'Delete session?',
+      message: `Delete ${session?.date || 'this session'} from ${exercise?.name || 'this exercise'}?`,
+      onConfirm: () => removeSession(exerciseId, sessionId),
+    });
   };
 
   const updateSessionDate = (exerciseId, sessionId, date) => {
@@ -201,6 +244,14 @@ function App() {
           : exercise,
       ),
     }));
+  };
+
+  const confirmRemoveSet = (exerciseId, sessionId, setId, setNumber) => {
+    requestDelete({
+      title: 'Delete set?',
+      message: `Delete set ${setNumber || ''}? This cannot be undone.`,
+      onConfirm: () => removeSet(exerciseId, sessionId, setId),
+    });
   };
 
   const updateSet = (exerciseId, sessionId, setId, field, value) => {
@@ -272,7 +323,7 @@ function App() {
             exerciseInput={exerciseInput}
             exerciseMuscles={exerciseMuscles}
             muscleInput={muscleInput}
-            removeMuscle={removeMuscle}
+            removeMuscle={confirmRemoveMuscle}
             setExerciseInput={setExerciseInput}
             setExerciseMuscles={setExerciseMuscles}
             setMuscleInput={setMuscleInput}
@@ -288,9 +339,9 @@ function App() {
                   addSet={addSet}
                   exercise={exercise}
                   key={exercise.id}
-                  removeExercise={removeExercise}
-                  removeSession={removeSession}
-                  removeSet={removeSet}
+                  removeExercise={confirmRemoveExercise}
+                  removeSession={confirmRemoveSession}
+                  removeSet={confirmRemoveSet}
                   updateSessionDate={updateSessionDate}
                   updateSet={updateSet}
                 />
@@ -309,6 +360,28 @@ function App() {
           </div>
         </section>
       </section>
+
+      {deletePrompt ? (
+        <div aria-modal="true" className="modal-backdrop" role="dialog">
+          <div className="confirm-modal">
+            <div className="modal-icon">
+              <AlertTriangle size={22} />
+            </div>
+            <div>
+              <h3>{deletePrompt.title}</h3>
+              <p>{deletePrompt.message}</p>
+            </div>
+            <div className="modal-actions">
+              <button className="text-button" onClick={closeDeletePrompt} type="button">
+                Cancel
+              </button>
+              <button className="text-button danger-fill" onClick={confirmDelete} type="button">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

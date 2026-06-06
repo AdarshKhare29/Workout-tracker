@@ -88,7 +88,7 @@ export function ExerciseCard({
                     <button
                       aria-label="Delete set"
                       className="icon-button"
-                      onClick={() => removeSet(exercise.id, session.id, set.id)}
+                      onClick={() => removeSet(exercise.id, session.id, set.id, setIndex + 1)}
                       type="button"
                     >
                       <Trash2 size={14} />
