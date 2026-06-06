@@ -64,6 +64,18 @@ const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({
   passwordHash: scryptSync(password, salt, 64).toString('hex'),
 });
 
+const normalizeCloudUser = (user) =>
+  user
+    ? {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        passwordHash: user.password_hash,
+        salt: user.salt,
+        createdAt: user.created_at,
+      }
+    : null;
+
 const verifyPassword = (password, user) => {
   const candidate = scryptSync(password, user.salt, 64);
   const stored = Buffer.from(user.passwordHash, 'hex');
@@ -186,7 +198,34 @@ async function saveAuthStore(store) {
   );
 }
 
+async function findUserByEmail(email) {
+  if (isCloudSyncEnabled) return findCloudUserByEmail(email);
+
+  const store = await readAuthStore();
+  return store.users.find((item) => item.email === email) || null;
+}
+
+async function createUser({ name, email, password }) {
+  const passwordFields = hashPassword(password);
+  const user = {
+    id: makeId(),
+    name,
+    email,
+    ...passwordFields,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (isCloudSyncEnabled) return createCloudUser(user);
+
+  const store = await readAuthStore();
+  store.users.push(user);
+  await saveAuthStore(store);
+  return user;
+}
+
 async function createSession(userId) {
+  if (isCloudSyncEnabled) return createCloudSession(userId);
+
   const store = await readAuthStore();
   const token = makeToken();
 
@@ -203,6 +242,17 @@ async function createSession(userId) {
   return token;
 }
 
+async function deleteSession(token) {
+  if (isCloudSyncEnabled) {
+    await deleteCloudSession(token);
+    return;
+  }
+
+  const store = await readAuthStore();
+  store.sessions = store.sessions.filter((session) => session.token !== token);
+  await saveAuthStore(store);
+}
+
 function getBearerToken(request) {
   const header = request.headers.authorization || '';
   const [scheme, token] = header.split(' ');
@@ -215,11 +265,119 @@ async function getAuthenticatedUser(request) {
   const token = getBearerToken(request);
   if (!token) return null;
 
+  if (isCloudSyncEnabled) return getCloudAuthenticatedUser(token);
+
   const store = await readAuthStore();
   const session = store.sessions.find((item) => item.token === token);
   if (!session) return null;
 
   const user = store.users.find((item) => item.id === session.userId);
+  return user ? { token, user } : null;
+}
+
+async function findCloudUserByEmail(email) {
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}&select=*`,
+    { headers: getSupabaseHeaders() },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Supabase user lookup failed with status ${response.status}.`);
+  }
+
+  const rows = await response.json();
+  return normalizeCloudUser(rows[0]);
+}
+
+async function createCloudUser(user) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/app_users`, {
+    body: JSON.stringify({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      password_hash: user.passwordHash,
+      salt: user.salt,
+      created_at: user.createdAt,
+    }),
+    headers: getSupabaseHeaders(),
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase user create failed with status ${response.status}.`);
+  }
+
+  const rows = await response.json();
+  return normalizeCloudUser(rows[0]);
+}
+
+async function createCloudSession(userId) {
+  const token = makeToken();
+  const deleteResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/app_sessions?user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      headers: getSupabaseHeaders(),
+      method: 'DELETE',
+    },
+  );
+
+  if (!deleteResponse.ok) {
+    throw new Error(`Supabase session cleanup failed with status ${deleteResponse.status}.`);
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/app_sessions`, {
+    body: JSON.stringify({
+      token,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+    }),
+    headers: getSupabaseHeaders(),
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase session create failed with status ${response.status}.`);
+  }
+
+  return token;
+}
+
+async function deleteCloudSession(token) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/app_sessions?token=eq.${encodeURIComponent(token)}`, {
+    headers: getSupabaseHeaders(),
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase session delete failed with status ${response.status}.`);
+  }
+}
+
+async function getCloudAuthenticatedUser(token) {
+  const sessionResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/app_sessions?token=eq.${encodeURIComponent(token)}&select=user_id`,
+    { headers: getSupabaseHeaders() },
+  );
+
+  if (!sessionResponse.ok) {
+    throw new Error(`Supabase session lookup failed with status ${sessionResponse.status}.`);
+  }
+
+  const sessions = await sessionResponse.json();
+  const userId = sessions[0]?.user_id;
+  if (!userId) return null;
+
+  const userResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/app_users?id=eq.${encodeURIComponent(userId)}&select=*`,
+    { headers: getSupabaseHeaders() },
+  );
+
+  if (!userResponse.ok) {
+    throw new Error(`Supabase authenticated user lookup failed with status ${userResponse.status}.`);
+  }
+
+  const users = await userResponse.json();
+  const user = normalizeCloudUser(users[0]);
   return user ? { token, user } : null;
 }
 
@@ -315,24 +473,17 @@ async function handleApi(request, response) {
       return;
     }
 
-    const store = await readAuthStore();
-    if (store.users.some((user) => user.email === email)) {
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
       sendJson(response, 409, { error: 'An account with this email already exists.' });
       return;
     }
 
-    const passwordFields = hashPassword(password);
-    const user = {
-      id: makeId(),
+    const user = await createUser({
       name,
       email,
-      ...passwordFields,
-      createdAt: new Date().toISOString(),
-    };
-
-    store.users.push(user);
-    await saveAuthStore(store);
-
+      password,
+    });
     const token = await createSession(user.id);
     sendJson(response, 201, { token, user: publicUser(user) });
     return;
@@ -342,8 +493,7 @@ async function handleApi(request, response) {
     const body = JSON.parse(await readRequestBody(request));
     const email = normalizeEmail(body.email);
     const password = String(body.password || '');
-    const store = await readAuthStore();
-    const user = store.users.find((item) => item.email === email);
+    const user = await findUserByEmail(email);
 
     if (!user || !verifyPassword(password, user)) {
       sendJson(response, 401, { error: 'Invalid email or password.' });
@@ -371,9 +521,7 @@ async function handleApi(request, response) {
     const token = getBearerToken(request);
 
     if (token) {
-      const store = await readAuthStore();
-      store.sessions = store.sessions.filter((session) => session.token !== token);
-      await saveAuthStore(store);
+      await deleteSession(token);
     }
 
     sendJson(response, 200, { ok: true });
