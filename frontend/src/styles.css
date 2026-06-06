@@ -301,6 +301,12 @@ input:focus {
   color: #fffaf2;
 }
 
+.text-button.danger-fill {
+  background: #a1432f;
+  border-color: #a1432f;
+  color: #fffaf2;
+}
+
 .text-button.compact {
   min-height: 36px;
   padding: 7px 11px;
@@ -499,6 +505,57 @@ input:focus {
   color: #69726b;
 }
 
+.modal-backdrop {
+  align-items: center;
+  background: rgba(20, 24, 22, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 20;
+}
+
+.confirm-modal {
+  background: #fffaf2;
+  border: 1px solid #e4dbce;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(20, 24, 22, 0.24);
+  display: grid;
+  gap: 16px;
+  max-width: 420px;
+  padding: 18px;
+  width: 100%;
+}
+
+.modal-icon {
+  align-items: center;
+  background: #fff0eb;
+  border: 1px solid #ebb09e;
+  border-radius: 999px;
+  color: #a1432f;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.confirm-modal h3 {
+  font-size: 1.2rem;
+  margin-bottom: 6px;
+}
+
+.confirm-modal p {
+  color: #59625c;
+  margin-bottom: 0;
+}
+
+.modal-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
 @media (min-width: 641px) {
   .app-shell {
     padding: 24px;
@@ -581,6 +638,10 @@ input:focus {
   .icon-button {
     flex-basis: 42px;
     min-height: 42px;
+  }
+
+  .modal-actions {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
