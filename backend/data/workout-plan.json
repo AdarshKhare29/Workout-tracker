@@ -1,0 +1,75 @@
+{
+  "Monday": {
+    "muscles": [
+      "Back",
+      "Biceps"
+    ],
+    "exercises": [
+      {
+        "id": "feebc0ab-cf85-4700-ab43-53c20b235c78",
+        "name": "Lat Pulldown",
+        "muscles": "Back",
+        "sessions": [
+          {
+            "id": "ffadc397-6f16-4e11-a4ea-a4ab9c1a1a47",
+            "date": "2026-05-29",
+            "sets": [
+              {
+                "id": "17ff1deb-8c2b-47a5-a64b-957d3c72fea5",
+                "weight": 35,
+                "reps": 12
+              },
+              {
+                "id": "1eb019dc-0093-473b-9d8c-b88bf20ad815",
+                "weight": 40,
+                "reps": 10
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ce11e34e-6c69-4c2c-9a66-8517898827dd",
+        "name": "Dumbbell Curl",
+        "muscles": "Biceps",
+        "sessions": [
+          {
+            "id": "2be8363c-4449-4d40-99a7-dd6f21400522",
+            "date": "2026-05-29",
+            "sets": [
+              {
+                "id": "53c6048f-50bf-4db2-bab6-347469c19744",
+                "weight": 10,
+                "reps": 12
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "Tuesday": {
+    "muscles": [],
+    "exercises": []
+  },
+  "Wednesday": {
+    "muscles": [],
+    "exercises": []
+  },
+  "Thursday": {
+    "muscles": [],
+    "exercises": []
+  },
+  "Friday": {
+    "muscles": [],
+    "exercises": []
+  },
+  "Saturday": {
+    "muscles": [],
+    "exercises": []
+  },
+  "Sunday": {
+    "muscles": [],
+    "exercises": []
+  }
+}
