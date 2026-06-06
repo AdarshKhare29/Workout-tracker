@@ -358,13 +358,23 @@ function App() {
   return (
     <main className="app-shell">
       <section className="hero">
-        <div>
+        <div className="hero-copy-block">
           <p className="eyebrow">Weekly Lift Tracker</p>
           <h1>Plan each training day and log every working set.</h1>
           <p className="hero-copy">
             Add muscles, exercises, sessions, weight, reps, and sets for all seven days. Your progress syncs through
             your profile and is ready for a cloud database.
           </p>
+        </div>
+        <div className="account-actions hero-account">
+          <span className="profile-pill">
+            <UserCircle size={16} />
+            {user.name}
+          </span>
+          <button className="text-button logout-button" onClick={handleLogout} type="button">
+            <LogOut size={17} />
+            Logout
+          </button>
         </div>
         <div className="stat-grid" aria-label="Workout stats">
           <Stat icon={<Dumbbell />} label="Exercises" value={stats.exercises} />
@@ -389,19 +399,10 @@ function App() {
                 ? 'Loading'
                 : saveState === 'saving'
                   ? 'Saving'
-                  : saveState === 'offline'
+                : saveState === 'offline'
                     ? 'Server offline'
                     : 'Synced'}
             </span>
-            <div className="account-actions">
-              <span className="profile-pill">
-                <UserCircle size={16} />
-                {user.name}
-              </span>
-              <button className="icon-button" onClick={handleLogout} type="button" aria-label="Logout">
-                <LogOut size={17} />
-              </button>
-            </div>
           </div>
 
           <WorkoutBuilder

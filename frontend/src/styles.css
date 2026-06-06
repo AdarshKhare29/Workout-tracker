@@ -155,11 +155,13 @@ p {
   color: #fffaf2;
   display: grid;
   gap: 14px;
-  padding: 16px;
   overflow: hidden;
+  padding: 16px;
+  position: relative;
 }
 
 .hero > *,
+.hero-copy-block,
 .workspace > *,
 .day-workspace,
 .day-panel,
@@ -192,6 +194,12 @@ h1 {
   font-size: 0.92rem;
   margin-bottom: 0;
   overflow-wrap: break-word;
+}
+
+.hero-account {
+  align-items: stretch;
+  justify-self: stretch;
+  order: -1;
 }
 
 .stat-grid {
@@ -352,6 +360,18 @@ h1 {
   padding: 8px 12px;
 }
 
+.hero-account .profile-pill,
+.logout-button {
+  background: rgba(255, 250, 242, 0.12);
+  border-color: rgba(255, 250, 242, 0.24);
+  color: #fffaf2;
+}
+
+.logout-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .save-pill.loading,
 .save-pill.saving {
   background: #fff4df;
@@ -410,6 +430,7 @@ input:focus {
   color: #24302a;
   gap: 8px;
   justify-content: center;
+  margin-bottom: 2px;
 }
 
 .text-button {
@@ -438,6 +459,7 @@ input:focus {
   min-height: 36px;
   padding: 7px 11px;
   width: max-content;
+  margin-top: 10px;
 }
 
 .icon-button {
@@ -578,7 +600,7 @@ input:focus {
 }
 
 .session-header {
-  align-items: stretch;
+  align-items: end;
   gap: 10px;
   justify-content: space-between;
   margin-bottom: 12px;
@@ -694,6 +716,12 @@ input:focus {
     padding: clamp(24px, 5vw, 52px);
   }
 
+  .hero-account {
+    align-items: center;
+    justify-self: end;
+    max-width: min(100%, 420px);
+  }
+
   h1 {
     font-size: clamp(2.4rem, 8vw, 4.8rem);
     line-height: 0.98;
@@ -777,6 +805,15 @@ input:focus {
   .hero {
     align-items: end;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 440px);
+  }
+
+  .hero-account {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .hero-copy-block {
+    grid-column: 1;
   }
 
   .workspace {
