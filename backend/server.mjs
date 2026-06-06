@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -26,16 +26,16 @@ loadEnvFile();
 const PORT = Number(process.env.PORT || 5174);
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SUPABASE_PLAN_ID = process.env.SUPABASE_PLAN_ID || 'default';
 const DATA_DIR = join(ROOT, 'data');
-const DATA_FILE = join(DATA_DIR, 'workout-plan.json');
+const USERS_FILE = join(DATA_DIR, 'users.json');
+const PLANS_DIR = join(DATA_DIR, 'plans');
 const DIST_DIR = join(ROOT, '..', 'frontend', 'dist');
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const isCloudSyncEnabled = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 const jsonHeaders = {
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
   'Access-Control-Allow-Origin': '*',
   'Content-Type': 'application/json',
 };
@@ -49,6 +49,26 @@ const mimeTypes = {
 };
 
 const makeId = () => randomUUID();
+const makeToken = () => randomBytes(32).toString('hex');
+
+const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
+
+const publicUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+});
+
+const hashPassword = (password, salt = randomBytes(16).toString('hex')) => ({
+  salt,
+  passwordHash: scryptSync(password, salt, 64).toString('hex'),
+});
+
+const verifyPassword = (password, user) => {
+  const candidate = scryptSync(password, user.salt, 64);
+  const stored = Buffer.from(user.passwordHash, 'hex');
+  return stored.length === candidate.length && timingSafeEqual(stored, candidate);
+};
 
 const splitMuscleList = (muscles = []) =>
   muscles
@@ -130,37 +150,108 @@ function getSupabaseHeaders() {
   };
 }
 
-async function ensurePlanFile() {
+async function ensureUsersFile() {
   await mkdir(DATA_DIR, { recursive: true });
 
   try {
-    await stat(DATA_FILE);
+    await stat(USERS_FILE);
   } catch {
-    await writeFile(DATA_FILE, JSON.stringify(defaultPlan(), null, 2));
+    await writeFile(USERS_FILE, JSON.stringify({ users: [], sessions: [] }, null, 2));
   }
 }
 
-async function readPlan() {
-  if (isCloudSyncEnabled) return readCloudPlan();
+async function readAuthStore() {
+  await ensureUsersFile();
+  const contents = await readFile(USERS_FILE, 'utf8');
+  const store = JSON.parse(contents);
 
-  await ensurePlanFile();
-  const contents = await readFile(DATA_FILE, 'utf8');
-  return normalizePlan(JSON.parse(contents));
+  return {
+    users: Array.isArray(store.users) ? store.users : [],
+    sessions: Array.isArray(store.sessions) ? store.sessions : [],
+  };
 }
 
-async function savePlan(plan) {
+async function saveAuthStore(store) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(
+    USERS_FILE,
+    JSON.stringify(
+      {
+        users: Array.isArray(store.users) ? store.users : [],
+        sessions: Array.isArray(store.sessions) ? store.sessions : [],
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function createSession(userId) {
+  const store = await readAuthStore();
+  const token = makeToken();
+
+  store.sessions = [
+    ...store.sessions.filter((session) => session.userId !== userId),
+    {
+      token,
+      userId,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  await saveAuthStore(store);
+  return token;
+}
+
+function getBearerToken(request) {
+  const header = request.headers.authorization || '';
+  const [scheme, token] = header.split(' ');
+
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+  return token;
+}
+
+async function getAuthenticatedUser(request) {
+  const token = getBearerToken(request);
+  if (!token) return null;
+
+  const store = await readAuthStore();
+  const session = store.sessions.find((item) => item.token === token);
+  if (!session) return null;
+
+  const user = store.users.find((item) => item.id === session.userId);
+  return user ? { token, user } : null;
+}
+
+async function readPlan(userId) {
+  if (isCloudSyncEnabled) return readCloudPlan(userId);
+
+  await mkdir(PLANS_DIR, { recursive: true });
+  const userPlanFile = join(PLANS_DIR, `${userId}.json`);
+
+  try {
+    const contents = await readFile(userPlanFile, 'utf8');
+    return normalizePlan(JSON.parse(contents));
+  } catch {
+    const seededPlan = defaultPlan();
+    await writeFile(userPlanFile, JSON.stringify(seededPlan, null, 2));
+    return normalizePlan(seededPlan);
+  }
+}
+
+async function savePlan(userId, plan) {
   if (isCloudSyncEnabled) {
-    await saveCloudPlan(plan);
+    await saveCloudPlan(userId, plan);
     return;
   }
 
-  await ensurePlanFile();
-  await writeFile(DATA_FILE, JSON.stringify(normalizePlan(plan), null, 2));
+  await mkdir(PLANS_DIR, { recursive: true });
+  await writeFile(join(PLANS_DIR, `${userId}.json`), JSON.stringify(normalizePlan(plan), null, 2));
 }
 
-async function readCloudPlan() {
+async function readCloudPlan(userId) {
   const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${encodeURIComponent(SUPABASE_PLAN_ID)}&select=plan`,
+    `${SUPABASE_URL}/rest/v1/workout_plans?id=eq.${encodeURIComponent(userId)}&select=plan`,
     { headers: getSupabaseHeaders() },
   );
 
@@ -172,14 +263,14 @@ async function readCloudPlan() {
   if (rows[0]?.plan) return normalizePlan(rows[0].plan);
 
   const seededPlan = defaultPlan();
-  await saveCloudPlan(seededPlan);
+  await saveCloudPlan(userId, seededPlan);
   return seededPlan;
 }
 
-async function saveCloudPlan(plan) {
+async function saveCloudPlan(userId, plan) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/workout_plans`, {
     body: JSON.stringify({
-      id: SUPABASE_PLAN_ID,
+      id: userId,
       plan: normalizePlan(plan),
       updated_at: new Date().toISOString(),
     }),
@@ -213,15 +304,105 @@ async function handleApi(request, response) {
     return;
   }
 
+  if (request.url === '/api/auth/signup' && request.method === 'POST') {
+    const body = JSON.parse(await readRequestBody(request));
+    const email = normalizeEmail(body.email);
+    const name = String(body.name || '').trim();
+    const password = String(body.password || '');
+
+    if (!name || !email || password.length < 6) {
+      sendJson(response, 400, { error: 'Name, valid email, and 6+ character password are required.' });
+      return;
+    }
+
+    const store = await readAuthStore();
+    if (store.users.some((user) => user.email === email)) {
+      sendJson(response, 409, { error: 'An account with this email already exists.' });
+      return;
+    }
+
+    const passwordFields = hashPassword(password);
+    const user = {
+      id: makeId(),
+      name,
+      email,
+      ...passwordFields,
+      createdAt: new Date().toISOString(),
+    };
+
+    store.users.push(user);
+    await saveAuthStore(store);
+
+    const token = await createSession(user.id);
+    sendJson(response, 201, { token, user: publicUser(user) });
+    return;
+  }
+
+  if (request.url === '/api/auth/login' && request.method === 'POST') {
+    const body = JSON.parse(await readRequestBody(request));
+    const email = normalizeEmail(body.email);
+    const password = String(body.password || '');
+    const store = await readAuthStore();
+    const user = store.users.find((item) => item.email === email);
+
+    if (!user || !verifyPassword(password, user)) {
+      sendJson(response, 401, { error: 'Invalid email or password.' });
+      return;
+    }
+
+    const token = await createSession(user.id);
+    sendJson(response, 200, { token, user: publicUser(user) });
+    return;
+  }
+
+  if (request.url === '/api/auth/me' && request.method === 'GET') {
+    const auth = await getAuthenticatedUser(request);
+
+    if (!auth) {
+      sendJson(response, 401, { error: 'Not authenticated.' });
+      return;
+    }
+
+    sendJson(response, 200, { user: publicUser(auth.user) });
+    return;
+  }
+
+  if (request.url === '/api/auth/logout' && request.method === 'POST') {
+    const token = getBearerToken(request);
+
+    if (token) {
+      const store = await readAuthStore();
+      store.sessions = store.sessions.filter((session) => session.token !== token);
+      await saveAuthStore(store);
+    }
+
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
   if (request.url === '/api/plan' && request.method === 'GET') {
-    sendJson(response, 200, { plan: await readPlan() });
+    const auth = await getAuthenticatedUser(request);
+
+    if (!auth) {
+      sendJson(response, 401, { error: 'Not authenticated.' });
+      return;
+    }
+
+    sendJson(response, 200, { plan: await readPlan(auth.user.id) });
     return;
   }
 
   if (request.url === '/api/plan' && request.method === 'PUT') {
+    const auth = await getAuthenticatedUser(request);
+
+    if (!auth) {
+      sendJson(response, 401, { error: 'Not authenticated.' });
+      return;
+    }
+
     try {
       const body = JSON.parse(await readRequestBody(request));
-      await savePlan(body.plan);
+      await savePlan(auth.user.id, body.plan);
       sendJson(response, 200, { ok: true });
     } catch {
       sendJson(response, 400, { error: 'Invalid workout plan payload.' });

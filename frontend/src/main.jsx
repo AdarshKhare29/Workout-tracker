@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, AlertTriangle, CalendarDays, Dumbbell, Layers3, Save } from 'lucide-react';
+import { Activity, AlertTriangle, CalendarDays, Dumbbell, Layers3, LogOut, Save, UserCircle } from 'lucide-react';
+import { fetchCurrentUser, logoutUser } from './api';
+import { AuthScreen } from './components/AuthScreen';
 import { DayPicker } from './components/DayPicker';
 import { ExerciseCard } from './components/ExerciseCard';
 import { MuscleTabs } from './components/MuscleTabs';
@@ -11,8 +13,13 @@ import { useWorkoutPlan } from './hooks/useWorkoutPlan';
 import { makeId } from './utils/ids';
 import './styles.css';
 
+const AUTH_TOKEN_KEY = 'weekly-lift-auth-token';
+
 function App() {
-  const { plan, saveState, setPlan } = useWorkoutPlan();
+  const [token, setToken] = useState(() => window.localStorage.getItem(AUTH_TOKEN_KEY) || '');
+  const [user, setUser] = useState(null);
+  const [authState, setAuthState] = useState(token ? 'loading' : 'signed-out');
+  const { plan, saveState, setPlan } = useWorkoutPlan(token);
   const [activeDay, setActiveDay] = useState('Monday');
   const [muscleInput, setMuscleInput] = useState('');
   const [exerciseInput, setExerciseInput] = useState('');
@@ -23,6 +30,40 @@ function App() {
   const dayPlan = plan[activeDay];
   const muscleGroups = useMemo(() => splitMuscleList(dayPlan.muscles), [dayPlan.muscles]);
   const normalizedDayPlan = useMemo(() => ({ ...dayPlan, muscles: muscleGroups }), [dayPlan, muscleGroups]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function restoreUser() {
+      if (!token) {
+        setUser(null);
+        setAuthState('signed-out');
+        return;
+      }
+
+      try {
+        const data = await fetchCurrentUser(token);
+
+        if (!ignore) {
+          setUser(data.user);
+          setAuthState('signed-in');
+        }
+      } catch {
+        if (!ignore) {
+          window.localStorage.removeItem(AUTH_TOKEN_KEY);
+          setToken('');
+          setUser(null);
+          setAuthState('signed-out');
+        }
+      }
+    }
+
+    restoreUser();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     setActiveMuscle('All');
@@ -254,6 +295,23 @@ function App() {
     });
   };
 
+  const handleAuthenticated = ({ token: nextToken, user: nextUser }) => {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+    setToken(nextToken);
+    setUser(nextUser);
+    setAuthState('signed-in');
+  };
+
+  const handleLogout = async () => {
+    const currentToken = token;
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    setToken('');
+    setUser(null);
+    setAuthState('signed-out');
+    setDeletePrompt(null);
+    await logoutUser(currentToken).catch(() => {});
+  };
+
   const updateSet = (exerciseId, sessionId, setId, field, value) => {
     updateDay(activeDay, (current) => ({
       ...current,
@@ -275,6 +333,28 @@ function App() {
     }));
   };
 
+  if (authState === 'loading') {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel loading-panel">
+          <div className="auth-brand">
+            <span>
+              <Dumbbell size={26} />
+            </span>
+            <div>
+              <p className="eyebrow">Weekly Lift Tracker</p>
+              <h1>Loading your profile</h1>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} />;
+  }
+
   return (
     <main className="app-shell">
       <section className="hero">
@@ -283,7 +363,7 @@ function App() {
           <h1>Plan each training day and log every working set.</h1>
           <p className="hero-copy">
             Add muscles, exercises, sessions, weight, reps, and sets for all seven days. Your progress syncs through
-            the shared server and is ready for a cloud database.
+            your profile and is ready for a cloud database.
           </p>
         </div>
         <div className="stat-grid" aria-label="Workout stats">
@@ -313,6 +393,15 @@ function App() {
                     ? 'Server offline'
                     : 'Synced'}
             </span>
+            <div className="account-actions">
+              <span className="profile-pill">
+                <UserCircle size={16} />
+                {user.name}
+              </span>
+              <button className="icon-button" onClick={handleLogout} type="button" aria-label="Logout">
+                <LogOut size={17} />
+              </button>
+            </div>
           </div>
 
           <WorkoutBuilder

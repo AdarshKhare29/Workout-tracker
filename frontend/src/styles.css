@@ -27,6 +27,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 h1,
 h2,
 h3,
@@ -38,6 +43,107 @@ p {
   min-height: 100vh;
   padding: 8px;
   width: 100%;
+}
+
+.auth-shell {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(31, 39, 35, 0.92), rgba(46, 74, 70, 0.86)),
+    #1f2723;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.auth-panel {
+  background: #fffaf2;
+  border: 1px solid #e4dbce;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(20, 24, 22, 0.24);
+  display: grid;
+  gap: 18px;
+  max-width: 460px;
+  padding: 18px;
+  width: 100%;
+}
+
+.loading-panel {
+  min-height: 180px;
+}
+
+.auth-brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.auth-brand > span {
+  align-items: center;
+  background: #315f45;
+  border-radius: 12px;
+  color: #fffaf2;
+  display: flex;
+  flex: 0 0 52px;
+  height: 52px;
+  justify-content: center;
+}
+
+.auth-brand h1 {
+  color: #1f2723;
+  font-size: 1.85rem;
+  line-height: 1.05;
+  margin-bottom: 0;
+}
+
+.auth-tabs {
+  background: #f4eadf;
+  border: 1px solid #e1d1bf;
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 5px;
+}
+
+.auth-tabs button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #59625c;
+  display: flex;
+  font-weight: 800;
+  gap: 7px;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.auth-tabs button.active {
+  background: #fffaf2;
+  color: #1f2723;
+  box-shadow: 0 8px 18px rgba(38, 45, 40, 0.08);
+}
+
+.auth-form {
+  display: grid;
+  gap: 13px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.form-error {
+  background: #fff0eb;
+  border: 1px solid #ebb09e;
+  border-radius: 8px;
+  color: #9b321e;
+  font-weight: 700;
+  margin-bottom: 0;
+  padding: 10px 12px;
 }
 
 .hero {
@@ -147,8 +253,10 @@ h1 {
 .exercise-header,
 .session-header,
 .header-actions,
+.account-actions,
 .input-row,
 .save-pill,
+.profile-pill,
 .text-button,
 .icon-button,
 .chip {
@@ -223,6 +331,25 @@ h1 {
   padding: 8px 12px;
   white-space: nowrap;
   width: 100%;
+}
+
+.account-actions {
+  gap: 8px;
+  width: 100%;
+}
+
+.profile-pill {
+  background: #ffffff;
+  border: 1px solid #d9d0c3;
+  border-radius: 999px;
+  color: #39443d;
+  flex: 1;
+  font-weight: 800;
+  gap: 7px;
+  min-height: 42px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 8px 12px;
 }
 
 .save-pill.loading,
@@ -618,6 +745,7 @@ input:focus {
   }
 
   .save-pill,
+  .account-actions,
   .header-actions .text-button {
     width: auto;
   }
