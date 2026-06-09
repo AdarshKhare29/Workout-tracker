@@ -487,6 +487,8 @@ input:focus {
   gap: 7px;
   min-height: 34px;
   padding: 6px 10px;
+  max-height: 50px;
+
 }
 
 .chip button {
@@ -592,6 +594,46 @@ input:focus {
   margin-top: 14px;
 }
 
+.previous-session-reference {
+  background: #f4eadf;
+  border: 1px solid #e1d1bf;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+  padding: 10px 12px;
+}
+
+.previous-session-reference > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.previous-session-reference span {
+  color: #667168;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.previous-session-reference strong {
+  overflow-wrap: anywhere;
+}
+
+.previous-set-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.previous-set {
+  background: #fffaf2;
+  border: 1px solid #e4dbce;
+  border-radius: 999px;
+  color: #39443d;
+  padding: 6px 9px;
+}
+
 .session {
   background: #f8f3ed;
   border: 1px solid #eadfd3;
@@ -614,6 +656,10 @@ input:focus {
 
 .session-header span {
   font-weight: 800;
+}
+
+.history-toggle {
+  width: 100%;
 }
 
 .set-table {
@@ -784,6 +830,11 @@ input:focus {
 
   .session-header > div {
     grid-template-columns: auto minmax(140px, 190px);
+  }
+
+  .previous-session-reference {
+    align-items: center;
+    grid-template-columns: minmax(130px, 190px) minmax(0, 1fr);
   }
 
   .set-row {

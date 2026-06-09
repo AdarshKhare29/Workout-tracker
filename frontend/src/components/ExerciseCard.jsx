@@ -1,4 +1,11 @@
-import { History, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, History, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+
+const formatSet = (set) => {
+  const weight = set.weight || '-';
+  const reps = set.reps || '-';
+  return `${weight} kg x ${reps}`;
+};
 
 export function ExerciseCard({
   addSession,
@@ -10,6 +17,11 @@ export function ExerciseCard({
   updateSessionDate,
   updateSet,
 }) {
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const previousSession = exercise.sessions[1];
+  const hiddenSessionCount = Math.max(exercise.sessions.length - 1, 0);
+  const visibleSessions = showAllSessions ? exercise.sessions : exercise.sessions.slice(0, 1);
+
   return (
     <article className="exercise-card">
       <header className="exercise-header">
@@ -35,7 +47,29 @@ export function ExerciseCard({
 
       {exercise.sessions.length ? (
         <div className="session-list">
-          {exercise.sessions.map((session, sessionIndex) => (
+          {previousSession ? (
+            <div className="previous-session-reference">
+              <div>
+                <span>Previous session</span>
+                <strong>{previousSession.date}</strong>
+              </div>
+              <div className="previous-set-list">
+                {previousSession.sets.length ? (
+                  previousSession.sets.map((set, setIndex) => (
+                    <span className="previous-set" key={set.id}>
+                      Set {setIndex + 1}: {formatSet(set)}
+                    </span>
+                  ))
+                ) : (
+                  <span className="previous-set">No sets logged</span>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {visibleSessions.map((session) => {
+            const sessionIndex = exercise.sessions.findIndex((item) => item.id === session.id);
+            return (
             <section className="session" key={session.id}>
               <div className="session-header">
                 <div>
@@ -101,7 +135,19 @@ export function ExerciseCard({
                 Add set
               </button>
             </section>
-          ))}
+            );
+          })}
+
+          {hiddenSessionCount ? (
+            <button
+              className="text-button history-toggle"
+              onClick={() => setShowAllSessions((current) => !current)}
+              type="button"
+            >
+              {showAllSessions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              {showAllSessions ? 'Hide previous sessions' : `Show ${hiddenSessionCount} previous sessions`}
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="no-session">

@@ -22,9 +22,9 @@ For true sync across devices, deploy this app/server and connect it to Supabase.
 4. Fill in `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 5. Start the server with `npm start`.
 
-When Supabase variables are present, the server stores workout plans in the `workout_plans` table by user id. Without them, it uses per-user JSON files in `backend/data/plans/` for local development.
+When Supabase variables are present, the server stores users, sessions, and workout plans in Supabase. Without them, it uses `backend/data/users.json` and per-user JSON files in `backend/data/plans/` for local development.
 
-User accounts are created through the app's signup screen. Local auth sessions are stored in `backend/data/users.json`, and each user's workout plan is saved separately: in Supabase by user id when cloud sync is enabled, or in `backend/data/plans/` during local-only development.
+User accounts are created through the app's signup screen. In cloud mode, accounts survive redeploys because auth data lives in the `app_users` and `app_sessions` tables, while plans live in `workout_plans` by user id.
 
 ## Project Structure
 
